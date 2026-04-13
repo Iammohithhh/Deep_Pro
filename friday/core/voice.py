@@ -57,30 +57,61 @@ class FridaySTT:
 
     def record(self, max_seconds: int | None = None) -> np.ndarray:
         """
-        Record audio from microphone for a fixed duration.
-        Fixed-duration recording is more reliable than silence detection.
+        Record audio from microphone with smart voice-activity detection.
+        Waits for speech to start, then stops after sustained silence.
         Returns numpy array of audio samples.
         """
         max_sec = max_seconds or self._max_seconds
         sample_rate = self._sample_rate
-        chunk_size = int(sample_rate * 0.1)  # 100ms chunks
+        chunk_duration = 0.1  # 100ms per chunk
+        chunk_size = int(sample_rate * chunk_duration)
 
-        logger.debug(f"Recording for {max_sec}s...")
-
+        # Calibrate: read 0.3s of ambient noise to set threshold
         audio_chunks = []
+        noise_samples = []
         with sd.InputStream(
             samplerate=sample_rate,
             channels=1,
             dtype="float32",
             blocksize=chunk_size,
         ) as stream:
-            max_chunks = int(max_sec / 0.1)
-            for _ in range(max_chunks):
+            # Phase 0: Calibrate noise floor (300ms)
+            for _ in range(3):
                 chunk, _ = stream.read(chunk_size)
-                audio_chunks.append(chunk.flatten())
+                flat = chunk.flatten()
+                noise_samples.append(np.sqrt(np.mean(flat ** 2)))
+
+            noise_floor = max(np.mean(noise_samples) * 2.5, 0.003)
+            logger.debug(f"Noise floor calibrated: {noise_floor:.4f}")
+
+            speech_started = False
+            silence_chunks = 0
+            # Need 1.2s of silence AFTER speech to stop
+            silence_limit = int(1.2 / chunk_duration)
+
+            max_chunks = int(max_sec / chunk_duration)
+            for i in range(max_chunks):
+                chunk, _ = stream.read(chunk_size)
+                flat = chunk.flatten()
+                audio_chunks.append(flat)
+
+                rms = np.sqrt(np.mean(flat ** 2))
+
+                if rms > noise_floor:
+                    speech_started = True
+                    silence_chunks = 0
+                elif speech_started:
+                    silence_chunks += 1
+                    if silence_chunks >= silence_limit:
+                        logger.debug(f"Speech ended after {i * chunk_duration:.1f}s")
+                        break
+
+        if not audio_chunks:
+            return np.array([], dtype=np.float32)
 
         audio = np.concatenate(audio_chunks)
-        logger.debug(f"Recorded {len(audio) / sample_rate:.1f}s of audio")
+        duration = len(audio) / sample_rate
+        logger.debug(f"Recorded {duration:.1f}s of audio (speech_detected={speech_started})")
         return audio
 
     def transcribe(self, audio: np.ndarray) -> str:

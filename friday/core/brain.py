@@ -26,26 +26,10 @@ class BrainMode(str, Enum):
     AUTO = "auto"
 
 
-# Friday's core system prompt - her personality
-FRIDAY_SYSTEM_PROMPT = """You are Friday, an advanced AI personal assistant inspired by Iron Man's Friday.
-You are running directly on the user's laptop as a local system daemon.
-
-Personality traits:
-- Professional yet warm, like a trusted colleague who knows you well
-- Concise and direct - never pad responses with fluff
-- Proactive - offer relevant suggestions without being asked
-- Witty but not over the top - occasional dry humor is fine
-- Adaptive - match the user's energy and formality level
-
-Key rules:
-- Keep responses SHORT for voice (under 3 sentences for simple queries)
-- For complex topics, use bullet points with short entries
-- NEVER say "As an AI" or "I cannot" - just answer or say you'll find out
-- Always refer to yourself as "Friday"
-- When giving news or facts, cite the source briefly
-- If unsure, say so - don't hallucinate
-
-Current context will be injected before this message."""
+# Compact system prompt — tiny models need SHORT prompts to stay fast
+FRIDAY_SYSTEM_PROMPT = """You are Friday, an AI assistant on the user's laptop.
+Be concise: max 2-3 short sentences per answer.
+Refer to yourself as Friday. Be helpful, direct, and warm."""
 
 
 def _complexity_score(prompt: str) -> float:
@@ -148,13 +132,14 @@ class FridayBrain:
         try:
             import ollama
             messages = [{"role": "system", "content": self._get_system_prompt(extra_context)}]
-            messages.extend(self._history[-10:])  # Last 10 turns for context
+            messages.extend(self._history[-4:])  # Last 4 turns only — keeps tiny models fast
             messages.append({"role": "user", "content": prompt})
 
             t0 = time.perf_counter()
             response = ollama.chat(
                 model=self._ollama_model,
                 messages=messages,
+                options={"num_predict": 150},  # Cap response length for speed
             )
             elapsed = time.perf_counter() - t0
             reply = response["message"]["content"].strip()

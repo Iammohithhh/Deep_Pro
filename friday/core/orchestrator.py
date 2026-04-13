@@ -147,6 +147,17 @@ class FridayOrchestrator:
     # Main Interaction Loop
     # ──────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _strip_wake_words(text: str) -> str:
+        """Remove wake word artifacts from transcript."""
+        import re
+        # Remove leading "friday", "hey friday", "okay friday", etc.
+        cleaned = re.sub(
+            r'^(?:hey\s+|okay?\s+|yo\s+)?friday[,!.\s]*',
+            '', text, flags=re.IGNORECASE
+        ).strip()
+        return cleaned
+
     def _on_wake(self):
         """Triggered when wake word 'Friday' is detected."""
         if not self.state.is_sleeping:
@@ -155,17 +166,32 @@ class FridayOrchestrator:
         logger.info("Friday activated by wake word")
         self.state.transition(FridayInteractionState.LISTENING)
 
-        # Listen for user speech
+        # Play a short confirmation beep via TTS
+        self.voice.say_sync("Yes?")
+
+        # Now listen for the actual command
         text = self.voice.listen()
-        if not text or len(text.strip()) < 2:
-            self.voice.say("Yes?")
-            text = self.voice.listen()
+        text = self._strip_wake_words(text) if text else ""
 
         if not text or len(text.strip()) < 2:
             self.state.transition(FridayInteractionState.SLEEPING)
             return
 
         self._process_query(text)
+
+    @staticmethod
+    def _truncate_for_voice(text: str, max_sentences: int = 3) -> str:
+        """Truncate response for voice output — keep first N sentences."""
+        import re
+        sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+        # Filter out markdown, bullet points, headers
+        spoken = [s for s in sentences if not s.startswith(('#', '-', '*', '|', '`'))]
+        if not spoken:
+            spoken = sentences[:max_sentences]
+        result = " ".join(spoken[:max_sentences])
+        if len(result) > 300:
+            result = result[:297] + "..."
+        return result
 
     def _process_query(self, text: str):
         """Process a user query end-to-end."""
@@ -192,13 +218,12 @@ class FridayOrchestrator:
         self.memory.conversation.save_turn("user", text)
         self.memory.conversation.save_turn("assistant", response)
 
-        # Respond
+        # Respond — truncate for voice (first 3 sentences max)
+        spoken_text = self._truncate_for_voice(response)
         self.state.transition(FridayInteractionState.SPEAKING)
-        self.hud.set_speech(response)
-        self.voice.say(response)
+        self.hud.set_speech(response)  # Show full text on HUD
+        self.voice.say_sync(spoken_text)  # Speak truncated version, BLOCK until done
 
-        # Brief pause then back to sleep
-        time.sleep(0.5)
         self.state.transition(FridayInteractionState.SLEEPING)
 
     def _handle_command(self, text: str) -> bool:

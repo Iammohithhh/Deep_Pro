@@ -46,8 +46,8 @@ stt:
   model: "base"                        # tiny | base | small | medium | large
   device: "cpu"                        # cpu | cuda (if GPU available)
   language: "en"
-  silence_threshold: 0.5              # seconds of silence to stop recording
-  max_record_seconds: 15
+  silence_threshold: 1.2              # seconds of silence AFTER speech to stop
+  max_record_seconds: 8               # max recording time (smart VAD stops early)
 
 # ─── Voice Output (TTS) ────────────────────────────────────
 tts:
