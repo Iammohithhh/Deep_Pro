@@ -192,16 +192,33 @@ class FridayOrchestrator:
 
     @staticmethod
     def _truncate_for_voice(text: str, max_sentences: int = 3) -> str:
-        """Truncate response for voice output — keep first N sentences."""
+        """Truncate response for voice output — keep first N sentences, improve naturalness."""
         import re
+        # Remove markdown formatting for speech
+        text = text.replace("**", "").replace("__", "").replace("`", "").replace("```", "")
+
+        # Split into sentences
         sentences = re.split(r'(?<=[.!?])\s+', text.strip())
-        # Filter out markdown, bullet points, headers
-        spoken = [s for s in sentences if not s.startswith(('#', '-', '*', '|', '`'))]
-        if not spoken:
-            spoken = sentences[:max_sentences]
-        result = " ".join(spoken[:max_sentences])
-        if len(result) > 300:
-            result = result[:297] + "..."
+
+        # Filter out headers, code blocks, bullet lists
+        spoken = [
+            s for s in sentences
+            if not any(s.startswith(prefix) for prefix in ['#', '- ', '* ', '| ', '> ', '```'])
+        ]
+
+        # Use markdown sentences if we filtered too much
+        if not spoken or len(spoken) < 2:
+            spoken = sentences
+
+        # Combine first N sentences, add period if missing
+        result = " ".join(spoken[:max_sentences]).strip()
+        if result and not result.endswith(('.', '!', '?')):
+            result += "."
+
+        # Limit to reasonable length for TTS
+        if len(result) > 400:
+            result = result[:397] + "..."
+
         return result
 
     def _process_query(self, text: str):
@@ -396,9 +413,46 @@ class FridayOrchestrator:
             logger.info(f"Break reminder sent after {duration:.0f}m")
 
     def _proactive_check(self):
-        """Periodically offer proactive help."""
-        # Only if user hasn't interacted recently
-        pass
+        """Periodically offer proactive help based on activity and mood."""
+        if not self.state.is_sleeping:
+            return  # Only when Friday is idle
+
+        # Check if user appears frustrated (mood detection)
+        mood = self.memory.preferences.get("user_mood")
+        if mood == "frustrated":
+            suggestions = [
+                "I notice you might be dealing with something tricky. Want some help?",
+                "Looks like you could use a hand. What can I do?",
+                "I'm here if you need assistance with anything.",
+            ]
+            import random
+            msg = random.choice(suggestions)
+            self.tray.notify("Friday - Proactive Help", msg)
+            self.hud.set_speech(f"[Proactive] {msg}")
+            logger.info("Proactive help offered for frustrated user")
+            return
+
+        # Check screen context for opportunities to help
+        screen_context = self.eyes.full_context()
+        if not screen_context:
+            return
+
+        # Detect if user is coding and might have issues
+        if any(kw in screen_context.lower() for kw in ["error", "exception", "syntax", "traceback", "debug"]):
+            msg = "I see an error in your code. Want me to take a look?"
+            self.tray.notify("Friday - Code Help", msg)
+            self.hud.set_speech(f"[Proactive] {msg}")
+            logger.info("Proactive code help offered")
+            return
+
+        # Detect long work sessions and suggest breaks
+        work_duration = self.memory.work.current_duration_minutes
+        if work_duration > 120 and not self.memory.preferences.get("break_offered_today"):
+            msg = f"You've been working for {work_duration:.0f} minutes. How about a quick break?"
+            self.tray.notify("Friday - Break Reminder", msg)
+            self.hud.set_speech(f"[Proactive] {msg}")
+            self.memory.preferences.set("break_offered_today", True)
+            logger.info("Proactive break suggestion offered")
 
     def _toggle_hud(self):
         """Show/hide HUD overlay."""
