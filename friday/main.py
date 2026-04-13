@@ -18,6 +18,7 @@ Entry point. Supports:
 
 import sys
 import os
+import signal
 import threading
 from pathlib import Path
 
@@ -30,6 +31,18 @@ from loguru import logger
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
+
+# Global reference for signal handler
+_friday_instance = None
+
+
+def _signal_handler(signum, frame):
+    """Handle Ctrl+C (SIGINT) gracefully."""
+    global _friday_instance
+    logger.info("Received Ctrl+C — shutting down gracefully...")
+    if _friday_instance:
+        _friday_instance.shutdown()
+    sys.exit(0)
 
 app = typer.Typer(add_completion=False, invoke_without_command=True)
 console = Console()
@@ -178,12 +191,17 @@ def _run_full_mode(minimized: bool = False):
       Main thread  → QApplication + HUD widget (Qt event loop)
       Background   → Orchestrator (wake word, voice, news, memory…)
     """
+    global _friday_instance
     from core.orchestrator import FridayOrchestrator
     from ui.hud import get_hud
     from config.loader import get as cfg
 
     friday = FridayOrchestrator()
+    _friday_instance = friday
     hud = get_hud()
+
+    # Register signal handler for Ctrl+C
+    signal.signal(signal.SIGINT, _signal_handler)
 
     # Step 1: Init Qt widget in main thread BEFORE starting orchestrator
     qt_app = hud.init_in_main_thread()
@@ -202,7 +220,7 @@ def _run_full_mode(minimized: bool = False):
 
     # Step 3: Block main thread on Qt event loop (or plain loop if no Qt)
     if qt_app is not None:
-        logger.info("Friday HUD running — close window or use tray to quit")
+        logger.info("Friday HUD running — close window or use tray to quit (Ctrl+C supported)")
         try:
             qt_app.exec()
         except KeyboardInterrupt:
@@ -211,7 +229,7 @@ def _run_full_mode(minimized: bool = False):
             friday.shutdown()
     else:
         # No GUI available — fall back to blocking loop
-        logger.info("No GUI — running headless. Ctrl+C to quit.")
+        logger.info("No GUI — running headless. Press Ctrl+C to quit.")
         try:
             friday.run_forever()
         except KeyboardInterrupt:
@@ -232,35 +250,41 @@ def _run_cli_mode():
     from core.memory import get_memory
     from core.eyes import get_eyes
 
+    # Register signal handler for Ctrl+C
+    signal.signal(signal.SIGINT, lambda s, f: (console.print("\n[dim]Goodbye.[/dim]"), sys.exit(0)))
+
     brain = get_brain()
     memory = get_memory()
     eyes = get_eyes()
     eyes.start_all()
 
-    console.print("\n[bold yellow]Friday CLI Mode[/bold yellow] - Type your message, Enter to send. 'quit' to exit.\n")
+    user_name = memory.get_user_name()
+    console.print(f"\n[bold yellow]Friday CLI Mode[/bold yellow] - Chat with {user_name} Friday")
+    console.print("[dim]Type your message, press Enter to send. Type 'quit' or 'exit' to leave.[/dim]\n")
 
-    while True:
-        try:
-            user_input = input("[You] ").strip()
-        except (EOFError, KeyboardInterrupt):
-            console.print("\n[dim]Goodbye.[/dim]")
-            break
+    try:
+        while True:
+            try:
+                user_input = input(f"[{user_name}] ").strip()
+            except (EOFError, KeyboardInterrupt):
+                console.print("\n[dim]Goodbye.[/dim]")
+                break
 
-        if not user_input:
-            continue
-        if user_input.lower() in ("quit", "exit", "bye"):
-            console.print("[dim]Friday offline.[/dim]")
-            break
+            if not user_input:
+                continue
+            if user_input.lower() in ("quit", "exit", "bye"):
+                console.print("[dim]Friday offline.[/dim]")
+                break
 
-        context = eyes.full_context() + " " + memory.context_summary()
-        response = brain.chat(user_input, extra_context=context)
+            context = eyes.full_context() + " " + memory.context_summary()
+            response = brain.chat(user_input, extra_context=context)
 
-        memory.conversation.save_turn("user", user_input)
-        memory.conversation.save_turn("assistant", response)
+            memory.conversation.save_turn("user", user_input)
+            memory.conversation.save_turn("assistant", response)
 
-        console.print(f"[bold yellow][Friday][/bold yellow] {response}\n")
-
-    eyes.stop_all()
+            console.print(f"[bold yellow][Friday][/bold yellow] {response}\n")
+    finally:
+        eyes.stop_all()
 
 
 # ──────────────────────────────────────────────────────────────
