@@ -203,12 +203,20 @@ def _run_full_mode(minimized: bool = False):
     # Step 3: Block main thread on Qt event loop (or plain loop if no Qt)
     if qt_app is not None:
         logger.info("Friday HUD running — close window or use tray to quit")
-        qt_app.exec()
-        friday.shutdown()
+        try:
+            qt_app.exec()
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+        finally:
+            friday.shutdown()
     else:
         # No GUI available — fall back to blocking loop
         logger.info("No GUI — running headless. Ctrl+C to quit.")
-        friday.run_forever()
+        try:
+            friday.run_forever()
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+            friday.shutdown()
 
 
 # ──────────────────────────────────────────────────────────────
