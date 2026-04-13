@@ -167,6 +167,23 @@ class FridayOrchestrator:
         ).strip()
         return cleaned
 
+    @staticmethod
+    def _get_time_context() -> str:
+        """Get time-aware context for smarter responses."""
+        import datetime
+        now = datetime.datetime.now()
+        hour = now.hour
+        day_name = now.strftime("%A")
+
+        if hour < 12:
+            return f"Early morning ({now.strftime('%I:%M %p')}). User may be starting their day."
+        elif hour < 17:
+            return f"Afternoon ({now.strftime('%I:%M %p')}). User is likely in work/productive mode."
+        elif hour < 21:
+            return f"Evening ({now.strftime('%I:%M %p')}). User may be winding down."
+        else:
+            return f"Late night ({now.strftime('%I:%M %p')}). User may be tired."
+
     def _on_wake(self):
         """Triggered when wake word 'Friday' is detected."""
         if not self.state.is_sleeping:
@@ -240,7 +257,8 @@ class FridayOrchestrator:
         screen_context = self.eyes.full_context()
         user_context = self.memory.context_summary()
         learning_summary = self.memory.preferences.get_learning_summary()
-        combined_context = ". ".join(filter(None, [user_context, screen_context, learning_summary]))
+        time_context = self._get_time_context()
+        combined_context = ". ".join(filter(None, [user_context, screen_context, learning_summary, time_context]))
 
         # Generate response
         self.state.transition(FridayInteractionState.THINKING)
@@ -283,7 +301,22 @@ class FridayOrchestrator:
         if any(kw in text_lower for kw in ["system status", "how are you", "status"]):
             status = self.brain.engine_status
             engine_txt = "Ollama" if status["ollama"] else "Claude API"
-            msg = f"All systems operational. Running on {engine_txt}. Session started this session."
+
+            # Add time-aware recommendation
+            import datetime
+            hour = datetime.datetime.now().hour
+            if hour >= 21 or hour < 6:
+                tip = "It's getting late - consider getting some rest soon."
+            elif hour < 9:
+                tip = "Good morning! You're up early."
+            elif hour < 12:
+                tip = "Morning's a great time for focused work."
+            elif hour >= 17:
+                tip = "Almost end of day - good time to wrap up and reflect."
+            else:
+                tip = "You're making good progress this afternoon."
+
+            msg = f"All systems operational. Running on {engine_txt}. {tip}"
             self.state.transition(FridayInteractionState.SPEAKING)
             self.voice.say(msg)
             self.hud.set_speech(msg)

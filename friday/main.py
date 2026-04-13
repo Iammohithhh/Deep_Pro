@@ -279,7 +279,25 @@ def _run_cli_mode():
             # Learn from interaction
             memory.preferences.learn_from_interaction(user_input)
 
-            context = eyes.full_context() + " " + memory.context_summary() + " " + memory.preferences.get_learning_summary()
+            # Build context with time awareness
+            import datetime
+            now = datetime.datetime.now()
+            hour = now.hour
+            if hour < 12:
+                time_context = f"Early morning ({now.strftime('%I:%M %p')})."
+            elif hour < 17:
+                time_context = f"Afternoon ({now.strftime('%I:%M %p')})."
+            elif hour < 21:
+                time_context = f"Evening ({now.strftime('%I:%M %p')})."
+            else:
+                time_context = f"Late night ({now.strftime('%I:%M %p')})."
+
+            context = " ".join(filter(None, [
+                eyes.full_context(),
+                memory.context_summary(),
+                memory.preferences.get_learning_summary(),
+                time_context
+            ]))
             response = brain.chat(user_input, extra_context=context)
 
             memory.conversation.save_turn("user", user_input)
