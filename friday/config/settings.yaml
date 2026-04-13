@@ -23,7 +23,7 @@ brain:
     #   phi3:mini  → ~2.3GB   (good quality, needs 6GB+ RAM)
     #   mistral    → ~4.5GB   (needs 8GB+ RAM)
     #   llama3     → ~5GB     (needs 8GB+ RAM)
-    model: "tinyllama"                 # CHANGED: mistral needs 4.5GB RAM, tinyllama only 600MB
+    model: "phi3:mini"                 # CHANGED: phi3:mini for better quality (2.3GB)
     timeout: 30
 
   claude:
