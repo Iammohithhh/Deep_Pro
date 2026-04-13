@@ -18,7 +18,12 @@ brain:
   ollama:
     enabled: true
     host: "http://localhost:11434"
-    model: "mistral"                   # mistral | llama3 | phi3 | gemma2
+    # Model RAM requirements (pick based on your available RAM):
+    #   tinyllama  → ~600MB   (best for 4GB RAM laptops)
+    #   phi3:mini  → ~2.3GB   (good quality, needs 6GB+ RAM)
+    #   mistral    → ~4.5GB   (needs 8GB+ RAM)
+    #   llama3     → ~5GB     (needs 8GB+ RAM)
+    model: "tinyllama"                 # CHANGED: mistral needs 4.5GB RAM, tinyllama only 600MB
     timeout: 30
 
   claude:

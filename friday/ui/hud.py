@@ -429,41 +429,59 @@ if HAS_QT:
 class HUDManager:
     """
     Manages the HUD overlay lifecycle.
-    Starts the Qt app in a background thread if not already running.
+
+    IMPORTANT: Qt requires QApplication to run in the main thread.
+    Use init_in_main_thread() from your main thread before starting
+    the orchestrator loop.  start() is kept for compatibility but
+    will only work if called from the main thread.
     """
 
     def __init__(self):
-        self._app: QApplication | None = None
-        self._widget: FridayHUDWidget | None = None
+        self._app: "QApplication | None" = None
+        self._widget: "FridayHUDWidget | None" = None
         self._thread: threading.Thread | None = None
         self._ready = threading.Event()
 
-    def start(self):
-        """Launch the HUD in a background thread."""
+    def init_in_main_thread(self):
+        """
+        Create QApplication + widget in the CURRENT (main) thread.
+        Call this before starting the orchestrator background threads.
+        Returns the QApplication so caller can call app.exec() to block.
+        """
         if not HAS_QT:
             logger.warning("PyQt6 not installed - HUD unavailable")
-            return
+            return None
         if not cfg("hud.enabled", True):
             logger.info("HUD disabled in config")
-            return
-
-        self._thread = threading.Thread(target=self._run_qt, daemon=True, name="FridayHUD")
-        self._thread.start()
-        self._ready.wait(timeout=5)
-        logger.info("HUD started")
-
-    def _run_qt(self):
-        """Qt event loop - runs in its own thread."""
+            return None
         try:
             app = QApplication.instance() or QApplication(sys.argv)
             self._app = app
             self._widget = FridayHUDWidget()
             self._widget.show()
             self._ready.set()
-            app.exec()
+            logger.info("HUD initialized in main thread")
+            return app
         except Exception as e:
-            logger.error(f"HUD error: {e}")
+            logger.error(f"HUD init error: {e}")
             self._ready.set()
+            return None
+
+    def start(self):
+        """
+        Legacy start method — only works correctly when called from
+        the main thread.  Prefer init_in_main_thread() + app.exec().
+        """
+        if not HAS_QT or not cfg("hud.enabled", True):
+            return
+        # If already initialized (e.g. by init_in_main_thread), skip
+        if self._widget is not None:
+            return
+        logger.warning(
+            "HUD.start() called — creating widget in current thread. "
+            "For full GUI use init_in_main_thread() from main.py instead."
+        )
+        self.init_in_main_thread()
 
     def stop(self):
         """Cleanly shut down HUD."""

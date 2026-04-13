@@ -18,6 +18,7 @@ Entry point. Supports:
 
 import sys
 import os
+import threading
 from pathlib import Path
 
 # Add project root to path
@@ -95,11 +96,7 @@ def main(
         _run_cli_mode()
         return
 
-    # Full mode with HUD + voice
-    from core.orchestrator import FridayOrchestrator
-    friday = FridayOrchestrator()
-    friday.start()
-    friday.run_forever()
+    _run_full_mode(minimized=minimized)
 
 
 @app.command()
@@ -116,10 +113,7 @@ def start(
         _run_cli_mode()
         return
 
-    from core.orchestrator import FridayOrchestrator
-    friday = FridayOrchestrator()
-    friday.start()
-    friday.run_forever()
+    _run_full_mode(minimized=minimized)
 
 
 @app.command()
@@ -170,6 +164,51 @@ def status():
     console.print(f"  Ollama:      {'[green]✓ Online[/green]' if s['ollama'] else '[red]✗ Offline[/red]'}")
     console.print(f"  Claude API:  {'[green]✓ Ready[/green]' if s['claude'] else '[dim]Not configured[/dim]'}")
     console.print(f"  Primary:     [cyan]{s['primary']}[/cyan]")
+
+
+# ──────────────────────────────────────────────────────────────
+# Full Mode (HUD + voice) — Qt MUST run in main thread on Windows
+# ──────────────────────────────────────────────────────────────
+
+def _run_full_mode(minimized: bool = False):
+    """
+    Start Friday with HUD overlay + voice.
+
+    Architecture (required by Qt on Windows):
+      Main thread  → QApplication + HUD widget (Qt event loop)
+      Background   → Orchestrator (wake word, voice, news, memory…)
+    """
+    from core.orchestrator import FridayOrchestrator
+    from ui.hud import get_hud
+    from config.loader import get as cfg
+
+    friday = FridayOrchestrator()
+    hud = get_hud()
+
+    # Step 1: Init Qt widget in main thread BEFORE starting orchestrator
+    qt_app = hud.init_in_main_thread()
+
+    # Step 2: Start all background systems in a daemon thread
+    def _bg():
+        try:
+            friday.start()
+            # Block the background thread — HUD shutdown will stop the loop
+            friday.run_forever()
+        except Exception as e:
+            logger.error(f"Orchestrator error: {e}")
+
+    bg = threading.Thread(target=_bg, daemon=True, name="FridayMain")
+    bg.start()
+
+    # Step 3: Block main thread on Qt event loop (or plain loop if no Qt)
+    if qt_app is not None:
+        logger.info("Friday HUD running — close window or use tray to quit")
+        qt_app.exec()
+        friday.shutdown()
+    else:
+        # No GUI available — fall back to blocking loop
+        logger.info("No GUI — running headless. Ctrl+C to quit.")
+        friday.run_forever()
 
 
 # ──────────────────────────────────────────────────────────────

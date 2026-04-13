@@ -161,11 +161,22 @@ class FridayBrain:
             logger.info(f"Ollama replied in {elapsed:.2f}s ({len(reply)} chars)")
             return reply
         except Exception as e:
+            err_str = str(e).lower()
             logger.error(f"Ollama error: {e}")
             if self._claude_enabled:
                 logger.info("Falling back to Claude API...")
                 return self._query_claude(prompt, extra_context)
-            return "I'm having trouble connecting to my local brain. Make sure Ollama is running (`ollama serve`)."
+            # Give specific advice based on error type
+            if "memory" in err_str or "ram" in err_str:
+                return (
+                    f"Not enough RAM to run '{self._ollama_model}'. "
+                    f"Run: ollama pull tinyllama  then set model: tinyllama in config/settings.yaml"
+                )
+            if "connection" in err_str or "refused" in err_str or "connect" in err_str:
+                return "Ollama isn't running. Open a terminal and run: ollama serve"
+            if "not found" in err_str or "no such" in err_str:
+                return f"Model '{self._ollama_model}' not downloaded. Run: ollama pull {self._ollama_model}"
+            return f"Ollama error: {e}"
 
     def _stream_ollama(self, prompt: str, extra_context: str = "") -> Generator[str, None, None]:
         """Stream response from Ollama token by token."""

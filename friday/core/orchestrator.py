@@ -375,12 +375,16 @@ class FridayOrchestrator:
     # ──────────────────────────────────────────────────────────
 
     def start(self):
-        """Start all Friday systems."""
+        """
+        Start all Friday background systems.
+        NOTE: HUD must be initialized BEFORE calling start() via
+        hud.init_in_main_thread() in main.py — Qt requires the main thread.
+        """
         logger.info("Starting Friday AI Assistant...")
         self._running = True
 
-        # Initialize UI first
-        self.hud.start()
+        # HUD is already initialized by main.py in the main thread.
+        # Only start tray here (it uses its own thread safely).
         self.tray.start()
 
         # Wire callbacks
