@@ -12,8 +12,8 @@ friday:
 
 # ─── AI Brain ──────────────────────────────────────────────
 brain:
-  primary: "ollama"                    # ollama | claude | auto
-  # "auto" = use ollama for quick queries, claude for complex ones
+  primary: "claude"                    # ollama | claude | auto (using Claude Pro!)
+  # "auto" = use ollama for quick, claude for complex
 
   ollama:
     enabled: true
@@ -23,13 +23,13 @@ brain:
     #   phi3:mini  → ~2.3GB   (good quality, needs 6GB+ RAM)
     #   mistral    → ~4.5GB   (needs 8GB+ RAM)
     #   llama3     → ~5GB     (needs 8GB+ RAM)
-    model: "phi3:mini"                 # CHANGED: phi3:mini for better quality (2.3GB)
+    model: "phi3:mini"                 # Fallback: phi3:mini for better quality (2.3GB)
     timeout: 30
 
   claude:
-    enabled: false                     # Set true if you have API key
-    model: "claude-haiku-4-5-20251001" # haiku (fast/cheap) | sonnet | opus
-    max_tokens: 1024
+    enabled: true                      # ✅ ENABLED - using Claude Pro subscription!
+    model: "claude-3-5-sonnet-20241022"  # Fastest + smartest model available
+    max_tokens: 2048
     # api_key set via ANTHROPIC_API_KEY env variable
 
 # ─── Wake Word ─────────────────────────────────────────────
