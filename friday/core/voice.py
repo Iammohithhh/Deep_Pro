@@ -8,6 +8,7 @@ Handles:
 """
 
 import io
+import os
 import queue
 import tempfile
 import threading
@@ -211,29 +212,60 @@ class FridayTTS:
         self._speak_text(text)
 
     def _speak_text(self, text: str):
-        """Internal: speak text using configured engine (must be called from non-daemon thread)."""
+        """Internal: speak text using configured engine (with gTTS fallback)."""
         self._is_speaking = True
         try:
+            # Try pyttsx3 first (offline, no network needed)
             self._init_pyttsx3()
-            if not self._engine:
-                logger.error("TTS engine failed to initialize")
+            if self._engine:
+                logger.debug(f"Using pyttsx3 TTS: {text[:50]}...")
+                self._engine.say(text)
+                self._engine.runAndWait()  # CRITICAL: Must be called
+                logger.debug("TTS playback completed (pyttsx3)")
                 return
 
-            # Queue and execute speech
-            logger.debug(f"Queuing TTS: {text[:50]}...")
-            self._engine.say(text)
-
-            # CRITICAL: runAndWait() must be called - it processes the queue and waits
-            # This is what actually produces audio output
-            self._engine.runAndWait()
-            logger.debug("TTS playback completed")
-
         except Exception as e:
-            logger.error(f"TTS playback error: {e}")
-            import traceback
-            logger.debug(traceback.format_exc())
-        finally:
-            self._is_speaking = False
+            logger.warning(f"pyttsx3 failed: {e}, trying gTTS fallback...")
+
+        # Fallback to gTTS if pyttsx3 fails
+        try:
+            from gtts import gTTS
+            import tempfile
+            import subprocess
+            import platform
+            import time
+
+            logger.info("Using gTTS fallback for audio")
+            # Generate speech using gTTS (requires internet)
+            tts = gTTS(text=text, lang='en', slow=False)
+
+            # Save to temp file and play
+            with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                tmp_path = tmp.name
+                tts.save(tmp_path)
+
+            # Play audio based on platform
+            if platform.system() == "Windows":
+                os.startfile(tmp_path)  # Windows: open with default player
+            elif platform.system() == "Darwin":
+                subprocess.run(["afplay", tmp_path])  # macOS
+            else:
+                subprocess.run(["ffplay", "-nodisp", "-autoexit", tmp_path],
+                             stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)  # Linux
+
+            # Brief pause for audio to complete, then cleanup
+            time.sleep(2)
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except:
+                pass
+
+            logger.debug("TTS playback completed (gTTS)")
+
+        except ImportError:
+            logger.error("gTTS not available. Install: pip install gtts")
+        except Exception as e:
+            logger.error(f"gTTS also failed: {e}")
 
     def _speak_worker(self):
         """Background thread that drains the speech queue (non-daemon, ensures audio completes)."""
