@@ -73,22 +73,43 @@ class SimpleAvatar(QWidget):
             Qt.WindowType.SplashScreen
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(QSize(200, 300))
+        # Increased size for better visibility (was 200x300)
+        self.setFixedSize(QSize(320, 420))
 
         layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(5)
 
-        # Character display
+        # Character display (larger)
         self.character_label = QLabel()
         self.character_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.character_label.setFont(QFont("Arial", 80))
+        # Bigger font for emoji/character (was 80)
+        self.character_label.setFont(QFont("Arial", 120))
+        # Add glow effect with minimal CSS
+        self.character_label.setStyleSheet("""
+            QLabel {
+                color: #00D4FF;
+                text-shadow: 0px 0px 10px #00D4FF;
+                background: rgba(0, 20, 40, 180);
+                border-radius: 10px;
+                padding: 10px;
+            }
+        """)
         layout.addWidget(self.character_label)
 
-        # Status text
+        # Status text (larger)
         self.status_label = QLabel("Friday")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setFont(QFont("Arial", 10))
-        self.status_label.setStyleSheet("color: #00D4FF; font-weight: bold;")
+        self.status_label.setFont(QFont("Arial", 14))
+        self.status_label.setStyleSheet("""
+            QLabel {
+                color: #00D4FF;
+                font-weight: bold;
+                background: rgba(0, 20, 40, 160);
+                border-radius: 5px;
+                padding: 5px;
+            }
+        """)
         layout.addWidget(self.status_label)
 
         self.setLayout(layout)
@@ -96,13 +117,14 @@ class SimpleAvatar(QWidget):
         # Position: top-right corner
         screen = QApplication.primaryScreen()
         geom = screen.geometry()
-        self.move(geom.width() - 220, 100)
+        self.move(geom.width() - 340, 50)
 
     def _setup_animations(self):
         """Setup animation timer."""
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self._animate_frame)
-        self.animation_timer.setInterval(200)  # 200ms per frame
+        # Faster animation: 150ms per frame for smoother motion
+        self.animation_timer.setInterval(150)
 
     def _connect_signals(self):
         """Connect avatar state signals."""
@@ -118,25 +140,28 @@ class SimpleAvatar(QWidget):
 
     def _animate_frame(self):
         """Animate avatar based on current state."""
-        self._animation_frame = (self._animation_frame + 1) % 4
+        self._animation_frame = (self._animation_frame + 1) % 8
 
         if self._state == "idle":
-            # Breathing idle animation
-            characters = ["🧠", "🧠", "🤖", "🤖"]
-            self.character_label.setText(characters[self._animation_frame])
+            # Breathing/relaxed idle animation (subtle)
+            characters = ["🤖", "✨🤖✨", "🤖", "✨🤖✨"]
+            idx = self._animation_frame % len(characters)
+            self.character_label.setText(characters[idx])
             self.status_label.setText("Friday • Ready")
 
         elif self._state == "thinking":
-            # Thinking/loading animation
-            chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+            # Thinking/loading animation - more dynamic
+            chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"]
             idx = self._animation_frame % len(chars)
+            # Use multiple thinking characters for more visual interest
             self.character_label.setText(f"🤔\n{chars[idx]}")
-            self.status_label.setText("Thinking...")
+            self.status_label.setText("Processing...")
 
         elif self._state == "speaking":
-            # Speaking animation (mouth movements)
-            mouths = ["💬", "💭", "💬", "💭"]
-            self.character_label.setText(mouths[self._animation_frame])
+            # Speaking animation - mouth movements
+            mouths = ["💬", "👄", "💬", "👄"]
+            idx = self._animation_frame % len(mouths)
+            self.character_label.setText(f"🤖\n{mouths[idx]}")
             self.status_label.setText("Speaking...")
 
     def _on_activated(self):
