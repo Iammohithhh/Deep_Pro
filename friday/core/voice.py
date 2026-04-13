@@ -300,17 +300,17 @@ class FridayVoice:
         """Interrupt Friday's current speech."""
         self.tts.stop()
 
-    def greet(self):
-        """Friday's startup greeting."""
+    def greet(self, user_name: str = "sir"):
+        """Friday's greeting with user's name."""
         import datetime
         hour = datetime.datetime.now().hour
         if hour < 12:
-            greeting = "Good morning"
+            time_greeting = "Good morning"
         elif hour < 17:
-            greeting = "Good afternoon"
+            time_greeting = "Good afternoon"
         else:
-            greeting = "Good evening"
-        self.say(f"{greeting}. Friday online. How can I help?")
+            time_greeting = "Good evening"
+        self.say(f"{time_greeting}, {user_name}. Friday online. How can I help?")
 
 
 # Global singleton

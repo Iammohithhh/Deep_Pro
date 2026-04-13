@@ -166,8 +166,10 @@ class FridayOrchestrator:
         logger.info("Friday activated by wake word")
         self.state.transition(FridayInteractionState.LISTENING)
 
-        # Play a short confirmation beep via TTS
-        self.voice.say_sync("Yes?")
+        # Play a short confirmation response with user's name
+        user_name = self.memory.get_user_name()
+        acknowledgment = f"Yes, {user_name}?" if user_name != "there" else "At your service, sir?"
+        self.voice.say_sync(acknowledgment)
 
         # Now listen for the actual command
         text = self.voice.listen()
@@ -452,10 +454,39 @@ class FridayOrchestrator:
             logger.warning(f"Initial data load failed: {e}")
 
     def _startup_sequence(self):
-        """Startup greeting sequence."""
+        """Startup greeting sequence with name learning."""
         time.sleep(3)  # Wait for everything to initialize
         user_name = self.memory.get_user_name()
-        greeting = f"Good morning {user_name}. Friday is online." if user_name != "there" else "Friday online. All systems operational."
+
+        # If we don't know the user's name, ask for it
+        if user_name == "there":
+            self.state.transition(FridayInteractionState.SPEAKING)
+            greeting = "Good morning, sir. I am Friday. What shall I call you?"
+            self.hud.set_speech(greeting)
+            self.voice.say_sync(greeting)
+
+            # Listen for name
+            self.state.transition(FridayInteractionState.LISTENING)
+            response = self.voice.listen()
+            if response and len(response.strip()) > 1:
+                # Extract name from response
+                self.memory.facts.extract_from_text(f"Call me {response}")
+                user_name = self.memory.get_user_name()
+                reply = f"Pleasure to meet you, {user_name}. I will remember that."
+                self.voice.say_sync(reply)
+                self.hud.set_speech(reply)
+            self.state.transition(FridayInteractionState.SLEEPING)
+
+        # Standard greeting with user's name
+        hour = __import__("datetime").datetime.now().hour
+        if hour < 12:
+            time_greeting = "Good morning"
+        elif hour < 17:
+            time_greeting = "Good afternoon"
+        else:
+            time_greeting = "Good evening"
+
+        greeting = f"{time_greeting}, {user_name}. Friday is online."
         self.state.transition(FridayInteractionState.SPEAKING)
         self.hud.set_speech(greeting)
         self.voice.say_sync(greeting)

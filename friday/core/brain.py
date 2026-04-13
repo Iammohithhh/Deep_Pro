@@ -29,7 +29,8 @@ class BrainMode(str, Enum):
 # Compact system prompt — tiny models need SHORT prompts to stay fast
 FRIDAY_SYSTEM_PROMPT = """You are Friday, an AI assistant on the user's laptop.
 Be concise: max 2-3 short sentences per answer.
-Refer to yourself as Friday. Be helpful, direct, and warm."""
+Address the user respectfully (use their name if known, otherwise "sir").
+Refer to yourself as Friday. Be helpful, direct, warm, and professional."""
 
 
 def _complexity_score(prompt: str) -> float:
