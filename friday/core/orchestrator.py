@@ -278,19 +278,20 @@ class FridayOrchestrator:
         time_context = self._get_time_context()
         combined_context = ". ".join(filter(None, [user_context, screen_context, learning_summary, time_context]))
 
-        # Generate response
-        self.state.transition(FridayInteractionState.THINKING)
-        response = self.brain.chat(text, extra_context=combined_context)
-
-        # Save to memory
+        # Record user message
         self.memory.conversation.save_turn("user", text)
-        self.memory.conversation.save_turn("assistant", response)
 
-        # Respond — truncate for voice (first 3 sentences max)
-        spoken_text = self._truncate_for_voice(response)
-        self.state.transition(FridayInteractionState.SPEAKING)
-        self.hud.set_speech(response)  # Show full text on HUD
-        self.voice.say_sync(spoken_text)  # Speak truncated version, BLOCK until done
+        # Generate and stream response
+        self.state.transition(FridayInteractionState.THINKING)
+
+        # Use streaming for faster perceived response (when using Claude)
+        status = self.brain.engine_status
+        use_streaming = status.get("claude") and status.get("primary") == "claude"
+
+        if use_streaming:
+            self._handle_streaming_response(text, extra_context=combined_context)
+        else:
+            self._handle_blocking_response(text, extra_context=combined_context)
 
         self.state.transition(FridayInteractionState.SLEEPING)
 
@@ -366,6 +367,73 @@ class FridayOrchestrator:
             return True
 
         return False
+
+    # ──────────────────────────────────────────────────────────
+    # Response Handling (Streaming vs Blocking)
+    # ──────────────────────────────────────────────────────────
+
+    def _handle_blocking_response(self, text: str, extra_context: str = ""):
+        """Get full response, then speak (traditional approach - used for Ollama)."""
+        response = self.brain.chat(text, extra_context=extra_context)
+        self.memory.conversation.save_turn("assistant", response)
+
+        # Respond — truncate for voice (first 3 sentences max)
+        spoken_text = self._truncate_for_voice(response)
+        self.state.transition(FridayInteractionState.SPEAKING)
+        self.hud.set_speech(response)  # Show full text on HUD
+        self.voice.say_sync(spoken_text)  # Speak truncated version, BLOCK until done
+
+    def _handle_streaming_response(self, text: str, extra_context: str = ""):
+        """Stream response token-by-token for perceived instant response."""
+        self.state.transition(FridayInteractionState.SPEAKING)
+
+        # Get streaming generator
+        token_stream = self.brain.chat(text, extra_context=extra_context, stream=True)
+
+        # Collect full response while streaming
+        full_response = ""
+        spoken_buffer = ""
+
+        try:
+            for token in token_stream:
+                full_response += token
+                spoken_buffer += token
+
+                # Update HUD with streaming text
+                self.hud.set_speech(full_response)
+
+                # Trigger avatar mouth animation
+                try:
+                    avatar = self.avatar
+                    if avatar and avatar.available:
+                        avatar.controller.speaking.emit()
+                except Exception:
+                    pass  # Avatar not available
+
+                # Buffer accumulation: speak every 20-30 tokens to avoid TTS lag
+                # This creates streaming-like speech effect
+                if len(spoken_buffer) > 80 or token.endswith(('.', '?', '!')):
+                    truncated = self._truncate_for_voice(spoken_buffer)
+                    if truncated:
+                        try:
+                            # Non-blocking speak (queue in background)
+                            self.voice.say(truncated)
+                            spoken_buffer = ""
+                        except Exception as e:
+                            logger.warning(f"Failed to speak during streaming: {e}")
+
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            full_response = f"I encountered an error: {e}"
+
+        # Speak any remaining buffered text
+        if spoken_buffer.strip():
+            truncated = self._truncate_for_voice(spoken_buffer)
+            if truncated:
+                self.voice.say_sync(truncated)
+
+        # Save full response to memory
+        self.memory.conversation.save_turn("assistant", full_response)
 
     # ──────────────────────────────────────────────────────────
     # Ambient Intelligence Callbacks
