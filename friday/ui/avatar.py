@@ -33,7 +33,7 @@ class AvatarAnimationController(QObject):
     # Signals for avatar state changes
     activated = pyqtSignal()      # Wake word detected
     thinking = pyqtSignal()       # Processing query
-    speaking = pyqtSignal(str)    # Speaking text
+    speaking = pyqtSignal()       # Speaking (no args needed)
     idle = pyqtSignal()           # Resting
     minimize = pyqtSignal()       # Hide avatar
 

@@ -190,7 +190,7 @@ class FridayTTS:
 
     def speak(self, text: str, interrupt: bool = False):
         """
-        Speak text aloud. Runs in background thread.
+        Speak text aloud. Runs in background thread (non-daemon to ensure audio completes).
         interrupt=True stops current speech first.
         """
         if not text or not text.strip():
@@ -200,7 +200,8 @@ class FridayTTS:
         self._queue.put(text)
         if self._thread is None or not self._thread.is_alive():
             self._stop_flag.clear()
-            self._thread = threading.Thread(target=self._speak_worker, daemon=True)
+            # IMPORTANT: daemon=False ensures thread completes before exit
+            self._thread = threading.Thread(target=self._speak_worker, daemon=False)
             self._thread.start()
 
     def speak_sync(self, text: str):
@@ -210,32 +211,45 @@ class FridayTTS:
         self._speak_text(text)
 
     def _speak_text(self, text: str):
-        """Internal: speak text using configured engine."""
+        """Internal: speak text using configured engine (must be called from non-daemon thread)."""
         self._is_speaking = True
         try:
-            if self._engine_name == "pyttsx3":
-                self._init_pyttsx3()
-                self._engine.say(text)
-                self._engine.runAndWait()
-            else:
-                # Fallback to pyttsx3 if edge-tts not available
-                self._init_pyttsx3()
-                self._engine.say(text)
-                self._engine.runAndWait()
+            self._init_pyttsx3()
+            if not self._engine:
+                logger.error("TTS engine failed to initialize")
+                return
+
+            # Queue and execute speech
+            logger.debug(f"Queuing TTS: {text[:50]}...")
+            self._engine.say(text)
+
+            # CRITICAL: runAndWait() must be called - it processes the queue and waits
+            # This is what actually produces audio output
+            self._engine.runAndWait()
+            logger.debug("TTS playback completed")
+
         except Exception as e:
-            logger.error(f"TTS error: {e}")
+            logger.error(f"TTS playback error: {e}")
+            import traceback
+            logger.debug(traceback.format_exc())
         finally:
             self._is_speaking = False
 
     def _speak_worker(self):
-        """Background thread that drains the speech queue."""
-        while not self._stop_flag.is_set():
-            try:
-                text = self._queue.get(timeout=0.5)
-                self._speak_text(text)
-                self._queue.task_done()
-            except queue.Empty:
-                break
+        """Background thread that drains the speech queue (non-daemon, ensures audio completes)."""
+        try:
+            while not self._stop_flag.is_set():
+                try:
+                    text = self._queue.get(timeout=0.5)
+                    if text:
+                        self._speak_text(text)
+                    self._queue.task_done()
+                except queue.Empty:
+                    break
+        except Exception as e:
+            logger.error(f"TTS worker error: {e}")
+        finally:
+            logger.debug("TTS worker thread exiting")
 
     def stop(self):
         """Stop current speech immediately."""
