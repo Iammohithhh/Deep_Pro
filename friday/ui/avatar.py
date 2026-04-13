@@ -1,11 +1,16 @@
 """
 Friday Avatar - Animated AI Assistant Character
 -----------------------------------------------
-Displays an animated female character that:
+Displays an animated character that:
 - Pops up when Friday is activated (wake word detected)
 - Shows thinking/speaking animations
+- Can use image-based PNGs or fallback to emoji
 - Disappears when done or minimized
-- Can be customized with different character styles
+
+Character assets should be placed in: assets/avatar/
+  - idle.png / idle_1.png, idle_2.png (idle animations)
+  - thinking.png / thinking_1.png, thinking_2.png (processing)
+  - speaking.png / speaking_1.png, speaking_2.png (speaking mouth)
 """
 
 import threading
@@ -40,9 +45,11 @@ class AvatarAnimationController(QObject):
 
 class SimpleAvatar(QWidget):
     """
-    Minimal animated avatar character.
-    Shows a simple character with animation states.
-    Can be upgraded to VRM/3D model later.
+    Animated avatar character with image/emoji support.
+    - Loads PNG images from assets/avatar/ if available
+    - Falls back to emoji animations if PNGs not found
+    - Smooth frame-by-frame animations
+    - Synced with speech and processing states
     """
 
     def __init__(self):
@@ -57,12 +64,72 @@ class SimpleAvatar(QWidget):
         self._is_visible = False
         self.controller = AvatarAnimationController()
 
+        # Load avatar assets
+        self._load_avatar_assets()
+
         # Setup UI
         self._setup_ui()
         self._setup_animations()
         self._connect_signals()
 
         logger.info("Avatar initialized")
+
+    def _load_avatar_assets(self):
+        """Load PNG avatar images if available, otherwise use emoji."""
+        self._use_images = False
+        self._image_cache = {}  # Cache loaded images
+
+        # Try to load PNG assets
+        assets_dir = Path(__file__).parent.parent.parent / "assets" / "avatar"
+        if assets_dir.exists():
+            self._load_png_assets(assets_dir)
+        else:
+            logger.info("No assets/avatar directory found — using emoji avatar")
+
+    def _load_png_assets(self, assets_dir: Path):
+        """Load PNG images from assets directory."""
+        states = ["idle", "thinking", "speaking"]
+
+        for state in states:
+            self._image_cache[state] = []
+
+            # Try to load numbered frames (idle_1.png, idle_2.png, etc.)
+            frame_num = 1
+            while True:
+                png_file = assets_dir / f"{state}_{frame_num}.png"
+                if not png_file.exists():
+                    break
+
+                try:
+                    pixmap = QPixmap(str(png_file))
+                    if not pixmap.isNull():
+                        self._image_cache[state].append(pixmap)
+                        logger.debug(f"Loaded: {png_file.name}")
+                except Exception as e:
+                    logger.warning(f"Failed to load {png_file.name}: {e}")
+
+                frame_num += 1
+
+            # Fallback: try single image file
+            if not self._image_cache[state]:
+                png_file = assets_dir / f"{state}.png"
+                if png_file.exists():
+                    try:
+                        pixmap = QPixmap(str(png_file))
+                        if not pixmap.isNull():
+                            self._image_cache[state].append(pixmap)
+                            logger.debug(f"Loaded: {png_file.name}")
+                    except Exception as e:
+                        logger.warning(f"Failed to load {png_file.name}: {e}")
+
+        # Check if any assets loaded successfully
+        if any(self._image_cache[state] for state in states):
+            self._use_images = True
+            logger.info(f"Avatar using PNG images (idle: {len(self._image_cache['idle'])}, "
+                       f"thinking: {len(self._image_cache['thinking'])}, "
+                       f"speaking: {len(self._image_cache['speaking'])} frames)")
+        else:
+            logger.info("No valid PNG assets found — using emoji fallback")
 
     def _setup_ui(self):
         """Create avatar UI."""
@@ -80,11 +147,13 @@ class SimpleAvatar(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(5)
 
-        # Character display (larger)
+        # Character display (larger, supports both emoji and images)
         self.character_label = QLabel()
         self.character_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         # Bigger font for emoji/character (was 80)
         self.character_label.setFont(QFont("Arial", 120))
+        # Set minimum size for image display
+        self.character_label.setMinimumHeight(200)
         # Add glow effect with minimal CSS
         self.character_label.setStyleSheet("""
             QLabel {
@@ -142,6 +211,36 @@ class SimpleAvatar(QWidget):
         """Animate avatar based on current state."""
         self._animation_frame = (self._animation_frame + 1) % 8
 
+        if self._use_images:
+            self._animate_frame_images()
+        else:
+            self._animate_frame_emoji()
+
+    def _animate_frame_images(self):
+        """Animate using PNG images."""
+        state_frames = self._image_cache.get(self._state, [])
+
+        if not state_frames:
+            # Fallback to emoji if this state has no images
+            self._animate_frame_emoji()
+            return
+
+        idx = self._animation_frame % len(state_frames)
+        pixmap = state_frames[idx]
+        # Scale to fit label while maintaining aspect ratio
+        scaled = pixmap.scaledToHeight(200, Qt.TransformationMode.SmoothTransformation)
+        self.character_label.setPixmap(scaled)
+
+        # Update status text
+        if self._state == "idle":
+            self.status_label.setText("Friday • Ready")
+        elif self._state == "thinking":
+            self.status_label.setText("Processing...")
+        elif self._state == "speaking":
+            self.status_label.setText("Speaking...")
+
+    def _animate_frame_emoji(self):
+        """Animate using emoji (fallback)."""
         if self._state == "idle":
             # Breathing/relaxed idle animation (subtle)
             characters = ["🤖", "✨🤖✨", "🤖", "✨🤖✨"]
