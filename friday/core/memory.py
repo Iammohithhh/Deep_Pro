@@ -254,6 +254,48 @@ class PreferenceMemory:
             rows = conn.execute("SELECT key, value FROM preferences").fetchall()
         return {r["key"]: json.loads(r["value"]) for r in rows}
 
+    def learn_from_interaction(self, text: str, response_quality: str = "good"):
+        """
+        Learn preferences from user interactions.
+        Track what topics user asks about, preferred response style, etc.
+        """
+        text_lower = text.lower()
+
+        # Learn response style preferences
+        if any(kw in text_lower for kw in ["concise", "short", "brief", "quick", "tl;dr"]):
+            self.set("preferred_response_style", "concise")
+        elif any(kw in text_lower for kw in ["explain", "detailed", "elaborate", "tell me more"]):
+            self.set("preferred_response_style", "detailed")
+
+        # Learn common topics
+        topics = self.get("common_topics", [])
+        if any(kw in text_lower for kw in ["code", "coding", "python", "javascript", "debug"]):
+            if "coding" not in topics:
+                topics.append("coding")
+        if any(kw in text_lower for kw in ["write", "writing", "article", "doc", "email"]):
+            if "writing" not in topics:
+                topics.append("writing")
+        if any(kw in text_lower for kw in ["data", "analysis", "statistics", "math"]):
+            if "data" not in topics:
+                topics.append("data")
+        if len(topics) > 5:
+            topics = topics[-5:]  # Keep only 5 most recent
+        self.set("common_topics", topics)
+
+    def get_learning_summary(self) -> str:
+        """Get a summary of learned preferences for context."""
+        prefs = []
+        style = self.get("preferred_response_style")
+        if style:
+            prefs.append(f"Preferred response style: {style}")
+        topics = self.get("common_topics", [])
+        if topics:
+            prefs.append(f"Interested in: {', '.join(topics)}")
+        mood = self.get("user_mood")
+        if mood:
+            prefs.append(f"Current mood: {mood}")
+        return ". ".join(prefs) if prefs else ""
+
 
 # ──────────────────────────────────────────────────────────────
 # Work Session Tracker (for mood & break reminders)

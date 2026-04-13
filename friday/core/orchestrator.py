@@ -216,10 +216,14 @@ class FridayOrchestrator:
         # Extract any facts from the query
         self.memory.facts.extract_from_text(text)
 
+        # Learn from user interaction
+        self.memory.preferences.learn_from_interaction(text)
+
         # Build ambient context
         screen_context = self.eyes.full_context()
         user_context = self.memory.context_summary()
-        combined_context = ". ".join(filter(None, [user_context, screen_context]))
+        learning_summary = self.memory.preferences.get_learning_summary()
+        combined_context = ". ".join(filter(None, [user_context, screen_context, learning_summary]))
 
         # Generate response
         self.state.transition(FridayInteractionState.THINKING)

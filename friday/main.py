@@ -276,7 +276,10 @@ def _run_cli_mode():
                 console.print("[dim]Friday offline.[/dim]")
                 break
 
-            context = eyes.full_context() + " " + memory.context_summary()
+            # Learn from interaction
+            memory.preferences.learn_from_interaction(user_input)
+
+            context = eyes.full_context() + " " + memory.context_summary() + " " + memory.preferences.get_learning_summary()
             response = brain.chat(user_input, extra_context=context)
 
             memory.conversation.save_turn("user", user_input)
