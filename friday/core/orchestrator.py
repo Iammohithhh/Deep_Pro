@@ -23,7 +23,25 @@ import threading
 import time
 from pathlib import Path
 
-from apscheduler.schedulers.background import BackgroundScheduler
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    SCHEDULER_AVAILABLE = True
+except ImportError:
+    SCHEDULER_AVAILABLE = False
+    # Simple fallback scheduler
+    class BackgroundScheduler:
+        def __init__(self, daemon=True):
+            self.daemon = daemon
+            self.jobs = {}
+            self._running = False
+        def add_job(self, func, trigger, **kwargs):
+            job_id = kwargs.get('id', str(len(self.jobs)))
+            self.jobs[job_id] = (func, trigger, kwargs)
+        def start(self):
+            self._running = True
+        def shutdown(self, wait=False):
+            self._running = False
+
 from loguru import logger
 
 from config.loader import get as cfg

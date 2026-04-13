@@ -10,11 +10,15 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from dotenv import load_dotenv
-from loguru import logger
 
-# Load .env file if present
-load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+# Try to load .env file (optional)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
+except ImportError:
+    pass  # dotenv not installed, but not required
+
+from loguru import logger
 
 _CONFIG_PATH = Path(__file__).parent / "settings.yaml"
 _config_cache: dict | None = None

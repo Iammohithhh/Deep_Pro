@@ -26,11 +26,20 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 
-import typer
 from loguru import logger
-from rich.console import Console
-from rich.panel import Panel
-from rich.text import Text
+
+# Try to import CLI tools, fall back to simple mode if unavailable
+try:
+    import typer
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.text import Text
+    CLI_AVAILABLE = True
+except ImportError:
+    CLI_AVAILABLE = False
+    class Console:
+        def print(self, *args, **kwargs):
+            print(*args)
 
 # Global reference for signal handler
 _friday_instance = None
@@ -44,8 +53,12 @@ def _signal_handler(signum, frame):
         _friday_instance.shutdown()
     sys.exit(0)
 
-app = typer.Typer(add_completion=False, invoke_without_command=True)
-console = Console()
+if CLI_AVAILABLE:
+    app = typer.Typer(add_completion=False, invoke_without_command=True)
+    console = Console()
+else:
+    app = None
+    console = None
 
 # ──────────────────────────────────────────────────────────────
 # Logging setup
@@ -67,6 +80,17 @@ def setup_logging(level: str = "INFO", log_to_file: bool = True):
 # ──────────────────────────────────────────────────────────────
 
 def print_banner():
+    if not CLI_AVAILABLE:
+        print("╔════════════════════════════════════════════════╗")
+        print("║  ◈ FRIDAY AI ASSISTANT ◈                      ║")
+        print("║  Iron Man inspired personal AI for your laptop║")
+        print("║                                               ║")
+        print("║  Wake word:  Friday                           ║")
+        print("║  Hotkey:     Ctrl+Shift+F                     ║")
+        print("║  Brain:      Ollama (local) + Claude API      ║")
+        print("╚════════════════════════════════════════════════╝\n")
+        return
+
     banner = Text()
     banner.append("◈ FRIDAY AI ASSISTANT ◈\n", style="bold yellow")
     banner.append("Iron Man inspired personal AI for your laptop\n", style="dim yellow")
@@ -82,101 +106,102 @@ def print_banner():
 
 
 # ──────────────────────────────────────────────────────────────
-# CLI Commands
+# CLI Commands (only define if typer is available)
 # ──────────────────────────────────────────────────────────────
 
-@app.callback()
-def main(
-    ctx: typer.Context,
-    cli: bool = typer.Option(False, "--cli", help="Run in terminal-only mode (no GUI)"),
-    minimized: bool = typer.Option(False, "--minimized", help="Start minimized to tray"),
-    debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
-):
-    """
-    Friday AI Assistant - Iron Man inspired personal AI for your laptop.
+if CLI_AVAILABLE:
+    @app.callback()
+    def main(
+        ctx: typer.Context,
+        cli: bool = typer.Option(False, "--cli", help="Run in terminal-only mode (no GUI)"),
+        minimized: bool = typer.Option(False, "--minimized", help="Start minimized to tray"),
+        debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
+    ):
+        """
+        Friday AI Assistant - Iron Man inspired personal AI for your laptop.
 
-    Run with no arguments to start in full mode (HUD + voice).
-    Use --cli to chat by typing instead of speaking.
-    """
-    # Only run if no subcommand was invoked (e.g. status, briefing, setup)
-    if ctx.invoked_subcommand is not None:
-        return
+        Run with no arguments to start in full mode (HUD + voice).
+        Use --cli to chat by typing instead of speaking.
+        """
+        # Only run if no subcommand was invoked (e.g. status, briefing, setup)
+        if ctx.invoked_subcommand is not None:
+            return
 
-    setup_logging("DEBUG" if debug else "INFO")
-    print_banner()
+        setup_logging("DEBUG" if debug else "INFO")
+        print_banner()
 
-    if cli:
-        _run_cli_mode()
-        return
+        if cli:
+            _run_cli_mode()
+            return
 
-    _run_full_mode(minimized=minimized)
-
-
-@app.command()
-def start(
-    cli: bool = typer.Option(False, "--cli", help="Run in terminal-only mode (no GUI)"),
-    minimized: bool = typer.Option(False, "--minimized", help="Start minimized to tray"),
-    debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
-):
-    """Explicitly start Friday AI Assistant (same as running with no subcommand)."""
-    setup_logging("DEBUG" if debug else "INFO")
-    print_banner()
-
-    if cli:
-        _run_cli_mode()
-        return
-
-    _run_full_mode(minimized=minimized)
+        _run_full_mode(minimized=minimized)
 
 
-@app.command()
-def setup():
-    """First-time setup wizard."""
-    setup_logging()
-    console.print("\n[bold yellow]◈ Friday Setup Wizard[/bold yellow]\n")
+    @app.command()
+    def start(
+        cli: bool = typer.Option(False, "--cli", help="Run in terminal-only mode (no GUI)"),
+        minimized: bool = typer.Option(False, "--minimized", help="Start minimized to tray"),
+        debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
+    ):
+        """Explicitly start Friday AI Assistant (same as running with no subcommand)."""
+        setup_logging("DEBUG" if debug else "INFO")
+        print_banner()
 
-    console.print("Checking dependencies...")
-    _check_dependencies()
+        if cli:
+            _run_cli_mode()
+            return
 
-    console.print("\nChecking Ollama...")
-    _check_ollama()
-
-    console.print("\n[bold green]Setup complete! Run: python main.py[/bold green]\n")
-
-
-@app.command()
-def briefing():
-    """Get an immediate news + weather briefing and exit."""
-    setup_logging()
-    from features.news import get_news, get_weather
-    from core.voice import get_voice
-
-    news = get_news()
-    weather = get_weather()
-    voice = get_voice()
-
-    console.print("[yellow]Fetching your morning briefing...[/yellow]")
-    weather_spoken = weather.spoken()
-    news_text = news.morning_briefing_text(n=5)
-    full = f"{weather_spoken} {news_text}"
-
-    console.print(Panel(full, title="Morning Briefing", border_style="yellow"))
-    voice.say_sync(full)
+        _run_full_mode(minimized=minimized)
 
 
-@app.command()
-def status():
-    """Show Friday's current system status."""
-    setup_logging()
-    from core.brain import get_brain
+    @app.command()
+    def setup():
+        """First-time setup wizard."""
+        setup_logging()
+        console.print("\n[bold yellow]◈ Friday Setup Wizard[/bold yellow]\n")
 
-    brain = get_brain()
-    s = brain.engine_status
+        console.print("Checking dependencies...")
+        _check_dependencies()
 
-    console.print(f"\n[bold yellow]◈ Friday Status[/bold yellow]")
-    console.print(f"  Ollama:      {'[green]✓ Online[/green]' if s['ollama'] else '[red]✗ Offline[/red]'}")
-    console.print(f"  Claude API:  {'[green]✓ Ready[/green]' if s['claude'] else '[dim]Not configured[/dim]'}")
-    console.print(f"  Primary:     [cyan]{s['primary']}[/cyan]")
+        console.print("\nChecking Ollama...")
+        _check_ollama()
+
+        console.print("\n[bold green]Setup complete! Run: python main.py[/bold green]\n")
+
+
+    @app.command()
+    def briefing():
+        """Get an immediate news + weather briefing and exit."""
+        setup_logging()
+        from features.news import get_news, get_weather
+        from core.voice import get_voice
+
+        news = get_news()
+        weather = get_weather()
+        voice = get_voice()
+
+        console.print("[yellow]Fetching your morning briefing...[/yellow]")
+        weather_spoken = weather.spoken()
+        news_text = news.morning_briefing_text(n=5)
+        full = f"{weather_spoken} {news_text}"
+
+        console.print(Panel(full, title="Morning Briefing", border_style="yellow"))
+        voice.say_sync(full)
+
+
+    @app.command()
+    def status():
+        """Show Friday's current system status."""
+        setup_logging()
+        from core.brain import get_brain
+
+        brain = get_brain()
+        s = brain.engine_status
+
+        console.print(f"\n[bold yellow]◈ Friday Status[/bold yellow]")
+        console.print(f"  Ollama:      {'[green]✓ Online[/green]' if s['ollama'] else '[red]✗ Offline[/red]'}")
+        console.print(f"  Claude API:  {'[green]✓ Ready[/green]' if s['claude'] else '[dim]Not configured[/dim]'}")
+        console.print(f"  Primary:     [cyan]{s['primary']}[/cyan]")
 
 
 # ──────────────────────────────────────────────────────────────
@@ -367,4 +392,40 @@ def _check_ollama():
 # ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    app()
+    if CLI_AVAILABLE:
+        app()
+    else:
+        # Simple fallback mode when typer not available
+        print("Starting Friday AI Assistant (simple mode)...")
+        setup_logging()
+        print_banner()
+
+        # Parse simple command line args
+        if len(sys.argv) > 1:
+            cmd = sys.argv[1].lower()
+            if cmd == "--cli":
+                _run_cli_mode()
+            elif cmd == "--briefing":
+                from features.news import get_news, get_weather
+                from core.voice import get_voice
+                news = get_news()
+                weather = get_weather()
+                voice = get_voice()
+                weather_spoken = weather.spoken()
+                news_text = news.morning_briefing_text(n=5)
+                full = f"{weather_spoken} {news_text}"
+                print(full)
+                voice.say_sync(full)
+            elif cmd == "--status":
+                from core.brain import get_brain
+                brain = get_brain()
+                s = brain.engine_status
+                print(f"\nFriday Status:")
+                print(f"  Ollama: {'✓ Online' if s['ollama'] else '✗ Offline'}")
+                print(f"  Claude API: {'✓ Ready' if s['claude'] else '✗ Not configured'}")
+                print(f"  Primary: {s['primary']}\n")
+            else:
+                _run_full_mode()
+        else:
+            # Default: run full mode
+            _run_full_mode()
