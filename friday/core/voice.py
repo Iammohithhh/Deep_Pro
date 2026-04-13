@@ -57,20 +57,17 @@ class FridaySTT:
 
     def record(self, max_seconds: int | None = None) -> np.ndarray:
         """
-        Record audio from microphone until silence or max_seconds.
+        Record audio from microphone for a fixed duration.
+        Fixed-duration recording is more reliable than silence detection.
         Returns numpy array of audio samples.
         """
         max_sec = max_seconds or self._max_seconds
         sample_rate = self._sample_rate
-        silence_sec = self._silence_threshold
+        chunk_size = int(sample_rate * 0.1)  # 100ms chunks
+
+        logger.debug(f"Recording for {max_sec}s...")
 
         audio_chunks = []
-        silence_counter = 0
-        chunk_size = int(sample_rate * 0.1)  # 100ms chunks
-        silence_limit = int(silence_sec / 0.1)  # chunks of silence before stopping
-
-        logger.debug("Recording started...")
-
         with sd.InputStream(
             samplerate=sample_rate,
             channels=1,
@@ -80,16 +77,7 @@ class FridaySTT:
             max_chunks = int(max_sec / 0.1)
             for _ in range(max_chunks):
                 chunk, _ = stream.read(chunk_size)
-                chunk = chunk.flatten()
-                audio_chunks.append(chunk)
-
-                rms = np.sqrt(np.mean(chunk ** 2))
-                if rms < 0.01:  # Silence threshold
-                    silence_counter += 1
-                    if silence_counter >= silence_limit and len(audio_chunks) > silence_limit:
-                        break
-                else:
-                    silence_counter = 0
+                audio_chunks.append(chunk.flatten())
 
         audio = np.concatenate(audio_chunks)
         logger.debug(f"Recorded {len(audio) / sample_rate:.1f}s of audio")
