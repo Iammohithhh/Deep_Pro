@@ -55,7 +55,7 @@ class FridayOrchestrator:
         self.weather = get_weather()
         self.hud = get_hud()
         self.tray = get_tray()
-        self.avatar = get_avatar()
+        self.avatar = None  # Lazy initialized after Qt is ready
         self.state = get_state()
 
         # Scheduler for periodic tasks
@@ -509,6 +509,11 @@ class FridayOrchestrator:
         """
         logger.info("Starting Friday AI Assistant...")
         self._running = True
+
+        # Initialize avatar now that Qt is ready (created after hud.init_in_main_thread)
+        if self.avatar is None:
+            self.avatar = get_avatar()
+            logger.info("Avatar initialized")
 
         # HUD is already initialized by main.py in the main thread.
         # Only start tray here (it uses its own thread safely).
