@@ -30,7 +30,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer(add_completion=False, invoke_without_command=True)
 console = Console()
 
 # ──────────────────────────────────────────────────────────────
@@ -71,23 +71,52 @@ def print_banner():
 # CLI Commands
 # ──────────────────────────────────────────────────────────────
 
-@app.command()
-def start(
+@app.callback()
+def main(
+    ctx: typer.Context,
     cli: bool = typer.Option(False, "--cli", help="Run in terminal-only mode (no GUI)"),
     minimized: bool = typer.Option(False, "--minimized", help="Start minimized to tray"),
     debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
 ):
-    """Start Friday AI Assistant in full mode."""
+    """
+    Friday AI Assistant - Iron Man inspired personal AI for your laptop.
+
+    Run with no arguments to start in full mode (HUD + voice).
+    Use --cli to chat by typing instead of speaking.
+    """
+    # Only run if no subcommand was invoked (e.g. status, briefing, setup)
+    if ctx.invoked_subcommand is not None:
+        return
+
     setup_logging("DEBUG" if debug else "INFO")
     print_banner()
-
-    from core.orchestrator import FridayOrchestrator
 
     if cli:
         _run_cli_mode()
         return
 
     # Full mode with HUD + voice
+    from core.orchestrator import FridayOrchestrator
+    friday = FridayOrchestrator()
+    friday.start()
+    friday.run_forever()
+
+
+@app.command()
+def start(
+    cli: bool = typer.Option(False, "--cli", help="Run in terminal-only mode (no GUI)"),
+    minimized: bool = typer.Option(False, "--minimized", help="Start minimized to tray"),
+    debug: bool = typer.Option(False, "--debug", help="Enable debug logging"),
+):
+    """Explicitly start Friday AI Assistant (same as running with no subcommand)."""
+    setup_logging("DEBUG" if debug else "INFO")
+    print_banner()
+
+    if cli:
+        _run_cli_mode()
+        return
+
+    from core.orchestrator import FridayOrchestrator
     friday = FridayOrchestrator()
     friday.start()
     friday.run_forever()
