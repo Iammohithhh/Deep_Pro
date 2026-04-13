@@ -35,6 +35,7 @@ from core.voice import get_voice
 from features.news import get_news, get_weather
 from ui.hud import get_hud
 from ui.tray import get_tray
+from ui.avatar import get_avatar
 
 
 class FridayOrchestrator:
@@ -54,6 +55,7 @@ class FridayOrchestrator:
         self.weather = get_weather()
         self.hud = get_hud()
         self.tray = get_tray()
+        self.avatar = get_avatar()
         self.state = get_state()
 
         # Scheduler for periodic tasks
@@ -81,6 +83,13 @@ class FridayOrchestrator:
         # State transitions → tray updates
         self.state.on(FridayInteractionState.LISTENING, lambda: self.tray.update_state("listening"))
         self.state.on(FridayInteractionState.SLEEPING, lambda: self.tray.update_state("sleeping"))
+
+        # State transitions → Avatar animations (if available)
+        if self.avatar:
+            self.state.on(FridayInteractionState.LISTENING, self.avatar.controller.activated.emit)
+            self.state.on(FridayInteractionState.THINKING, self.avatar.controller.thinking.emit)
+            self.state.on(FridayInteractionState.SPEAKING, self.avatar.controller.speaking.emit)
+            self.state.on(FridayInteractionState.SLEEPING, self.avatar.controller.idle.emit)
 
         # Screen context changes → proactive help
         self.eyes.screen.on_context_change(self._on_app_change)
@@ -513,6 +522,8 @@ class FridayOrchestrator:
         self.ears.stop()
         self.eyes.stop_all()
         self.hud.stop()
+        if self.avatar:
+            self.avatar.stop()
         self.tray.stop()
 
         logger.info("Friday offline.")
