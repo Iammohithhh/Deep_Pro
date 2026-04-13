@@ -559,43 +559,43 @@ class FridayOrchestrator:
             logger.warning(f"Initial data load failed: {e}")
 
     def _startup_sequence(self):
-        """Startup greeting sequence with name learning."""
+        """Startup greeting sequence with name learning (simplified, no state transitions)."""
         time.sleep(3)  # Wait for everything to initialize
         user_name = self.memory.get_user_name()
 
-        # If we don't know the user's name, ask for it
-        if user_name == "there":
-            self.state.transition(FridayInteractionState.SPEAKING)
-            greeting = "Good morning, sir. I am Friday. What shall I call you?"
+        try:
+            # If we don't know the user's name, ask for it
+            if user_name == "there":
+                greeting = "Good morning, sir. I am Friday. What shall I call you?"
+                self.hud.set_speech(greeting)
+                self.voice.say_sync(greeting)
+
+                # Listen for name
+                response = self.voice.listen()
+                if response and len(response.strip()) > 1:
+                    # Extract name from response
+                    self.memory.facts.extract_from_text(f"Call me {response}")
+                    user_name = self.memory.get_user_name()
+                    reply = f"Pleasure to meet you, {user_name}. I will remember that."
+                    self.voice.say_sync(reply)
+                    self.hud.set_speech(reply)
+
+            # Standard greeting with user's name
+            hour = __import__("datetime").datetime.now().hour
+            if hour < 12:
+                time_greeting = "Good morning"
+            elif hour < 17:
+                time_greeting = "Good afternoon"
+            else:
+                time_greeting = "Good evening"
+
+            greeting = f"{time_greeting}, {user_name}. Friday is online."
             self.hud.set_speech(greeting)
             self.voice.say_sync(greeting)
 
-            # Listen for name
-            self.state.transition(FridayInteractionState.LISTENING)
-            response = self.voice.listen()
-            if response and len(response.strip()) > 1:
-                # Extract name from response
-                self.memory.facts.extract_from_text(f"Call me {response}")
-                user_name = self.memory.get_user_name()
-                reply = f"Pleasure to meet you, {user_name}. I will remember that."
-                self.voice.say_sync(reply)
-                self.hud.set_speech(reply)
-            self.state.transition(FridayInteractionState.SLEEPING)
-
-        # Standard greeting with user's name
-        hour = __import__("datetime").datetime.now().hour
-        if hour < 12:
-            time_greeting = "Good morning"
-        elif hour < 17:
-            time_greeting = "Good afternoon"
-        else:
-            time_greeting = "Good evening"
-
-        greeting = f"{time_greeting}, {user_name}. Friday is online."
-        self.state.transition(FridayInteractionState.SPEAKING)
-        self.hud.set_speech(greeting)
-        self.voice.say_sync(greeting)
-        self.state.transition(FridayInteractionState.SLEEPING)
+        except Exception as e:
+            logger.warning(f"Startup sequence error: {e}")
+            logger.info("Continuing anyway - Friday is ready")
 
     def run_forever(self):
         """Block and run the event loop."""
