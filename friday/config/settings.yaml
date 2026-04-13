@@ -1,0 +1,137 @@
+# ============================================================
+# FRIDAY AI ASSISTANT - Configuration
+# Edit this file to customize your Friday experience
+# ============================================================
+
+friday:
+  name: "Friday"                      # Wake word (must match model)
+  personality: "professional"          # professional | casual | sarcastic | friendly
+  voice_gender: "female"               # female | male
+  voice_speed: 1.0                     # 0.5 = slow, 1.0 = normal, 1.5 = fast
+  language: "en"                       # Language code
+
+# ─── AI Brain ──────────────────────────────────────────────
+brain:
+  primary: "ollama"                    # ollama | claude | auto
+  # "auto" = use ollama for quick queries, claude for complex ones
+
+  ollama:
+    enabled: true
+    host: "http://localhost:11434"
+    model: "mistral"                   # mistral | llama3 | phi3 | gemma2
+    timeout: 30
+
+  claude:
+    enabled: false                     # Set true if you have API key
+    model: "claude-haiku-4-5-20251001" # haiku (fast/cheap) | sonnet | opus
+    max_tokens: 1024
+    # api_key set via ANTHROPIC_API_KEY env variable
+
+# ─── Wake Word ─────────────────────────────────────────────
+wake_word:
+  enabled: true
+  word: "friday"
+  sensitivity: 0.6                     # 0.0 = strict, 1.0 = very sensitive
+  device_index: null                   # null = system default mic
+  chunk_size: 1280
+  sample_rate: 16000
+
+# ─── Voice Input (STT) ─────────────────────────────────────
+stt:
+  model: "base"                        # tiny | base | small | medium | large
+  device: "cpu"                        # cpu | cuda (if GPU available)
+  language: "en"
+  silence_threshold: 0.5              # seconds of silence to stop recording
+  max_record_seconds: 15
+
+# ─── Voice Output (TTS) ────────────────────────────────────
+tts:
+  engine: "pyttsx3"                    # pyttsx3 | edge (online, natural)
+  rate: 180                            # words per minute (180 = natural speed)
+  volume: 0.9                          # 0.0 to 1.0
+
+# ─── HUD Overlay ───────────────────────────────────────────
+hud:
+  enabled: true
+  position: "top-right"               # top-right | top-left | bottom-right | bottom-left
+  opacity: 0.85
+  theme: "iron_man"                   # iron_man | minimal | neon
+  always_on_top: true
+  width: 340
+  show_news_ticker: true
+  show_clock: true
+  show_battery: true
+  show_listening_indicator: true
+
+# ─── News ──────────────────────────────────────────────────
+news:
+  enabled: true
+  refresh_interval_minutes: 30
+  max_headlines: 10
+  sources:
+    - name: "BBC News"
+      url: "http://feeds.bbci.co.uk/news/rss.xml"
+    - name: "Reuters"
+      url: "https://feeds.reuters.com/reuters/topNews"
+    - name: "Hacker News"
+      url: "https://hnrss.org/frontpage"
+    - name: "TechCrunch"
+      url: "https://techcrunch.com/feed/"
+  categories:
+    - world
+    - technology
+    - science
+
+# ─── Morning Briefing ──────────────────────────────────────
+morning_briefing:
+  enabled: true
+  auto_on_startup: true               # Speak news when laptop opens
+  time: "09:00"                       # Also trigger at specific time
+  include_weather: true
+  include_top_news: 5                 # Number of news items to read
+
+# ─── Screen Awareness ──────────────────────────────────────
+screen:
+  enabled: true
+  capture_interval_seconds: 5        # How often to analyze screen
+  ocr_enabled: true                  # Read text from screen
+  proactive_suggestions: true        # Offer help based on screen content
+
+# ─── Clipboard Intelligence ────────────────────────────────
+clipboard:
+  enabled: true
+  watch: true                        # Monitor clipboard changes
+  auto_suggest: true                 # Suggest actions for copied content
+
+# ─── Memory ────────────────────────────────────────────────
+memory:
+  enabled: true
+  db_path: "data/friday_memory.db"
+  max_history: 100                   # Max conversation turns to keep
+  summarize_after: 20               # Summarize old context after N turns
+
+# ─── Mood / Ambient Intelligence ───────────────────────────
+mood:
+  enabled: true
+  detect_typing_stress: true        # Detect rapid/frustrated typing
+  work_session_tracking: true       # Track work sessions
+  break_reminder_minutes: 90        # Suggest breaks every N minutes
+
+# ─── System Integration ────────────────────────────────────
+system:
+  auto_startup: false               # Launch on OS boot (set via setup)
+  minimize_to_tray: true
+  hotkey: "ctrl+shift+f"            # Global hotkey to activate Friday
+  notify_on_startup: true
+
+# ─── Weather (free, no API key needed) ─────────────────────
+weather:
+  enabled: true
+  auto_detect_location: true
+  location: null                    # Override: "New York, US"
+
+# ─── Logging ───────────────────────────────────────────────
+logging:
+  level: "INFO"                     # DEBUG | INFO | WARNING | ERROR
+  log_to_file: true
+  log_path: "data/friday.log"

@@ -1,0 +1,64 @@
+# ============================================================
+# FRIDAY AI ASSISTANT - Requirements
+# One step above every JARVIS/Friday project online
+# ============================================================
+
+# ─── Core AI / LLM ──────────────────────────────────────────
+anthropic>=0.40.0             # Claude API (fallback + advanced queries)
+ollama>=0.3.0                 # Local Ollama LLM client
+
+# ─── Voice Input (Speech to Text) ───────────────────────────
+faster-whisper>=1.0.0         # Fast offline STT (GPU/CPU)
+sounddevice>=0.4.6            # Audio capture
+numpy>=1.24.0                 # Audio array processing
+scipy>=1.11.0                 # Audio filtering
+
+# ─── Wake Word Detection ─────────────────────────────────────
+openwakeword>=0.6.0           # "Friday" wake word, free, offline
+
+# ─── Voice Output (Text to Speech) ──────────────────────────
+pyttsx3>=2.90                 # Offline TTS (cross-platform)
+# edge-tts>=6.1.9             # Optional: Microsoft neural TTS (online, natural)
+
+# ─── UI / HUD Overlay ────────────────────────────────────────
+PyQt6>=6.6.0                  # Iron Man HUD transparent overlay
+PyQt6-Qt6>=6.6.0
+Pillow>=10.0.0                # Image processing for UI
+
+# ─── System Tray ─────────────────────────────────────────────
+pystray>=0.19.5               # Cross-platform system tray icon
+
+# ─── Screen Awareness ────────────────────────────────────────
+mss>=9.0.0                    # Ultra-fast screen capture
+pytesseract>=0.3.10           # OCR - read text from screen
+opencv-python>=4.8.0          # Image processing for screen analysis
+
+# ─── News & Web ──────────────────────────────────────────────
+feedparser>=6.0.10            # RSS/Atom feed parser (BBC, Reuters etc.)
+httpx>=0.27.0                 # Async HTTP client
+beautifulsoup4>=4.12.0        # HTML parsing
+lxml>=4.9.0                   # Fast XML/HTML parser
+
+# ─── Memory / Database ───────────────────────────────────────
+# Built-in sqlite3 (no install needed)
+# chromadb>=0.5.0             # Optional: vector DB for semantic memory
+
+# ─── Scheduler / Async ───────────────────────────────────────
+apscheduler>=3.10.0           # Background task scheduler
+asyncio-mqtt>=0.16.0          # Async event handling
+
+# ─── System / OS Integration ─────────────────────────────────
+psutil>=5.9.0                 # System info (CPU, RAM, battery)
+pyperclip>=1.8.2              # Clipboard monitoring
+keyboard>=0.13.5              # Global hotkeys
+pyaudio>=0.2.14               # Low-level audio (wake word stream)
+webrtcvad>=2.0.10             # Voice Activity Detection
+
+# ─── Utilities ───────────────────────────────────────────────
+pydantic>=2.5.0               # Config validation
+python-dotenv>=1.0.0          # .env config management
+rich>=13.7.0                  # Beautiful terminal output
+loguru>=0.7.0                 # Smart logging
+typer>=0.9.0                  # CLI interface
+PyYAML>=6.0.0                 # YAML config files
+requests>=2.31.0              # HTTP requests
