@@ -17,7 +17,8 @@ scipy>=1.11.0                 # Audio filtering
 openwakeword>=0.6.0           # "Friday" wake word, free, offline
 
 # ─── Voice Output (Text to Speech) ──────────────────────────
-pyttsx3>=2.90                 # Offline TTS (cross-platform)
+pyttsx3>=2.90                 # Primary: Offline TTS (cross-platform)
+gtts>=2.3.0                   # Fallback: Google TTS (reliable, requires internet)
 # edge-tts>=6.1.9             # Optional: Microsoft neural TTS (online, natural)
 
 # ─── UI / HUD Overlay ────────────────────────────────────────
